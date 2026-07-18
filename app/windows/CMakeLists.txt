@@ -56,6 +56,18 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# gal 2.3.2 enables the deprecated coroutine TS with /await even though its
+# Windows target already uses C++20. Use the standard C++20 coroutine support
+# required by current MSVC versions while keeping the plugin implementation.
+if(MSVC AND TARGET gal_plugin)
+  get_target_property(GAL_PLUGIN_COMPILE_OPTIONS gal_plugin COMPILE_OPTIONS)
+  if(GAL_PLUGIN_COMPILE_OPTIONS)
+    list(REMOVE_ITEM GAL_PLUGIN_COMPILE_OPTIONS "/await")
+    set_target_properties(gal_plugin PROPERTIES
+      COMPILE_OPTIONS "${GAL_PLUGIN_COMPILE_OPTIONS}")
+  endif()
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
