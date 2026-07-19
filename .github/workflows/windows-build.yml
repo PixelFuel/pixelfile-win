@@ -73,14 +73,14 @@ jobs:
           Write-Host "Created installer: $($installer.FullName)"
 
       - name: Upload Windows build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PixelFile-Windows
           path: |
             app/build/windows/x64/runner/Release
 
       - name: Upload Windows installer EXE
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PixelFile-Windows-Installer
           path: app/build/windows/installer/PixelFile-Setup.exe
