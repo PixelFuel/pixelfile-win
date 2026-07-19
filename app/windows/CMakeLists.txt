@@ -58,6 +58,10 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# JNI is only used by PixelFile's Android dependencies. Disable opportunistic
+# Windows JNI discovery so the build does not vary with the runner's JDK setup.
+set(CMAKE_DISABLE_FIND_PACKAGE_JNI TRUE)
+
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
@@ -89,12 +93,54 @@ endif()
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 
+# Build the MSIX helper required by the Windows Share Target. The generated
+# package stays in the build directory and is never checked into source control.
+find_program(MAKEAPPX_EXECUTABLE NAMES MakeAppx.exe makeappx.exe)
+if(NOT MAKEAPPX_EXECUTABLE)
+  get_filename_component(WINDOWS_KITS_ROOT
+    "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]"
+    ABSOLUTE)
+  file(GLOB MAKEAPPX_CANDIDATES LIST_DIRECTORIES FALSE
+    "${WINDOWS_KITS_ROOT}/bin/*/x64/MakeAppx.exe"
+    "${WINDOWS_KITS_ROOT}/App Certification Kit/MakeAppx.exe")
+  list(SORT MAKEAPPX_CANDIDATES)
+  list(REVERSE MAKEAPPX_CANDIDATES)
+  if(MAKEAPPX_CANDIDATES)
+    list(GET MAKEAPPX_CANDIDATES 0 MAKEAPPX_EXECUTABLE)
+  endif()
+endif()
+
+if(NOT MAKEAPPX_EXECUTABLE)
+  message(FATAL_ERROR
+    "MakeAppx.exe was not found. Install the Windows 10/11 SDK before building PixelFile.")
+endif()
+
+set(MSIX_HELPER_SOURCE_DIR
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../support/build/msix")
+set(MSIX_HELPER_OUTPUT
+  "${CMAKE_CURRENT_BINARY_DIR}/localsend_msix_helper.msix")
+file(GLOB_RECURSE MSIX_HELPER_INPUTS CONFIGURE_DEPENDS
+  "${MSIX_HELPER_SOURCE_DIR}/*")
+
+add_custom_command(
+  OUTPUT "${MSIX_HELPER_OUTPUT}"
+  COMMAND "${MAKEAPPX_EXECUTABLE}" pack /o
+    /d "${MSIX_HELPER_SOURCE_DIR}"
+    /nv
+    /p "${MSIX_HELPER_OUTPUT}"
+  DEPENDS ${MSIX_HELPER_INPUTS}
+  COMMENT "Building Windows Share Target MSIX helper"
+  VERBATIM)
+add_custom_target(localsend_msix_helper ALL
+  DEPENDS "${MSIX_HELPER_OUTPUT}")
+add_dependencies(${BINARY_NAME} localsend_msix_helper)
+
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
 install(FILES
   "${BINARY_NAME}.exe.manifest"
-  "localsend_msix_helper.msix"
+  "${MSIX_HELPER_OUTPUT}"
   "install_msix_helper.ps1"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

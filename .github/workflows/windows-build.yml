@@ -28,6 +28,22 @@ jobs:
         working-directory: app
         run: flutter build windows --release
 
+      - name: Verify Windows release artifacts
+        working-directory: app
+        shell: pwsh
+        run: |
+          $requiredArtifacts = @(
+            "build/windows/x64/runner/Release/localsend_app.exe",
+            "build/windows/x64/runner/Release/flutter_windows.dll",
+            "build/windows/x64/runner/Release/rust_lib_localsend_app.dll",
+            "build/windows/x64/runner/Release/localsend_msix_helper.msix",
+            "build/windows/x64/runner/Release/data/app.so"
+          )
+          $missingArtifacts = $requiredArtifacts | Where-Object { -not (Test-Path $_) }
+          if ($missingArtifacts.Count -gt 0) {
+            throw "Missing Windows release artifacts: $($missingArtifacts -join ', ')"
+          }
+
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
